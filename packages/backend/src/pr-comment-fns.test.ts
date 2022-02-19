@@ -43,7 +43,7 @@ describe(convert, () => {
     describe("from owner", () => {
       it("should convert to POST request if contexts PR is not commented by self", () => {
         const log = require("../test/gql-log/update-pr-comment-context/data_for_post.json");
-        const actual1 = convert(log.data, { ...eventBodyV1, headOid: "499639feebc0fd11c202a1e2d6f148e8f9691a03" } );
+        const actual1 = convert(log.data, { ...eventBodyV1, headOid: "499639feebc0fd11c202a1e2d6f148e8f9691a03" });
         if (!Array.isArray(actual1)) return fail();
         expect(actual1.length).toBe(1);
         expect(actual1[0].method).toBe("POST");
@@ -52,7 +52,7 @@ describe(convert, () => {
 
       it("should convert to PATCH request if contexts PR is commented by self", () => {
         const log = require("../test/gql-log/update-pr-comment-context/data_for_patch.json");
-        const actual = convert(log.data, { ...eventBodyV1, headOid: "499639feebc0fd11c202a1e2d6f148e8f9691a03" } );
+        const actual = convert(log.data, { ...eventBodyV1, headOid: "499639feebc0fd11c202a1e2d6f148e8f9691a03" });
         if (!Array.isArray(actual)) return fail();
         expect(actual.length).toBe(1);
         expect(actual[0].method).toBe("PATCH");
@@ -63,7 +63,7 @@ describe(convert, () => {
     describe("forked PR", () => {
       it("should convert to POST request if contexts PR is not commented by self", () => {
         const log = require("../test/gql-log/update-pr-comment-context/data_for_post.json");
-        const actual = convert(log.data, { ...eventBodyV1, headOid: "ccebaba076d6ecb38426f8de23af8cb4cd423284" } );
+        const actual = convert(log.data, { ...eventBodyV1, headOid: "ccebaba076d6ecb38426f8de23af8cb4cd423284" });
         if (!Array.isArray(actual)) return fail();
         expect(actual.length).toBe(1);
         expect(actual[0].method).toBe("POST");
@@ -72,7 +72,7 @@ describe(convert, () => {
 
       it("should convert to PATCH request if contexts PR is commented by self", () => {
         const log = require("../test/gql-log/update-pr-comment-context/data_for_patch.json");
-        const actual = convert(log.data, { ...eventBodyV1, headOid: "ccebaba076d6ecb38426f8de23af8cb4cd423284" } );
+        const actual = convert(log.data, { ...eventBodyV1, headOid: "ccebaba076d6ecb38426f8de23af8cb4cd423284" });
         if (!Array.isArray(actual)) return fail();
         expect(actual.length).toBe(1);
         expect(actual[0].method).toBe("PATCH");

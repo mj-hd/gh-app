@@ -4,7 +4,7 @@ import { CommentToPrBody } from "reg-gh-app-interface";
 import { PullRequestOpenPayload } from "./webhook-detect";
 import { decodeMetadata } from "./status-fns";
 
-export type CommentToPrEventBody  = CommentToPrBody;
+export type CommentToPrEventBody = CommentToPrBody;
 
 export interface WriteIssueCommentBody {
   body: string;
@@ -31,8 +31,9 @@ export function validateEventBody(input: Partial<CommentToPrEventBody>) {
     typeof input.failedItemsCount === "number" &&
     typeof input.newItemsCount === "number" &&
     typeof input.deletedItemsCount === "number" &&
-    typeof input.passedItemsCount === "number"
-  ;
+    typeof input.passedItemsCount === "number" &&
+    (input.shortDescription == null || typeof input.shortDescription === "boolean")
+    ;
   if (!result) throw new DataValidationError(400, "invalid params");
   return true;
 }
@@ -43,6 +44,64 @@ export interface CommentSeed {
   newItemsCount: number;
   deletedItemsCount: number;
   passedItemsCount: number;
+  shortDescription?: boolean;
+}
+
+function tableItem(itemCount: number, header: string): [number, string] | null {
+  return itemCount == 0 ? null : [itemCount, header];
+}
+
+/**
+ * Returns a small table with the item counts.
+ *
+ * @example
+ * | 🔴 Changed | ⚪️ New | 🔵 Passing |
+ * | ---        | ---    | ---        |
+ * | 3          | 4      | 120        |
+ */
+function shortDescription({
+  failedItemsCount,
+  newItemsCount,
+  deletedItemsCount,
+  passedItemsCount,
+}: CommentSeed) {
+  const descriptions = [
+    tableItem(failedItemsCount, ":red_circle:  Changed"),
+    tableItem(newItemsCount, ":white_circle:  New"),
+    tableItem(deletedItemsCount, ":black_circle:  Deleted"),
+    tableItem(passedItemsCount, ":large_blue_circle:  Passing"),
+  ];
+
+  const filteredDescriptions = descriptions.filter((item): item is [number, string] => item != null);
+
+  const headerColumns = filteredDescriptions.map(([_, header]) => header);
+  const headerDelimiter = filteredDescriptions.map(() => " --- ");
+  const itemCount = filteredDescriptions.map(([itemCount]) => itemCount);
+
+  return [
+    `| ${headerColumns.join(" | ")} |`,
+    `| ${headerDelimiter.join(" | ")} |`,
+    `| ${itemCount.join(" | ")} |`,
+  ].join("\n");
+}
+
+function longDescription(eventBody: CommentSeed) {
+  const lines = [];
+  lines.push(new Array(eventBody.failedItemsCount + 1).join(":red_circle:"));
+  lines.push(new Array(eventBody.newItemsCount + 1).join(":white_circle:"));
+  lines.push(new Array(eventBody.deletedItemsCount + 1).join(":black_circle:"));
+  lines.push(new Array(eventBody.passedItemsCount + 1).join(":large_blue_circle:"));
+  lines.push("");
+  lines.push(`<details>
+                <summary>What do the circles mean?</summary>
+                The number of circles represent the number of changed images. <br />
+                :red_circle: : Changed items,
+                :white_circle: : New items,
+                :black_circle: : Deleted items, and
+                :large_blue_circle: Passed items
+                <br />
+             </details><br />`);
+  return lines.join("\n");
 }
 
 export function createCommentBody(eventBody: CommentSeed) {
@@ -61,25 +120,18 @@ export function createCommentBody(eventBody: CommentSeed) {
       lines.push(`Check [this report](${eventBody.reportUrl}), and review them.`);
       lines.push("");
     }
-    lines.push(new Array(eventBody.failedItemsCount + 1).join(":red_circle:"));
-    lines.push(new Array(eventBody.newItemsCount + 1).join(":white_circle:"));
-    lines.push(new Array(eventBody.deletedItemsCount + 1).join(":black_circle:"));
-    lines.push(new Array(eventBody.passedItemsCount + 1).join(":large_blue_circle:"));
-    lines.push("");
+
+    if (eventBody.shortDescription === true) {
+      lines.push(shortDescription(eventBody));
+    } else {
+      lines.push(longDescription(eventBody));
+    }
+
     lines.push(`<details>
-                  <summary>What do the circles mean?</summary>
-                  The number of circles represent the number of changed images. <br />
-                  :red_circle: : Changed items,
-                  :white_circle: : New items,
-                  :black_circle: : Deleted items, and
-                  :large_blue_circle: Passed items
-                  <br />
-               </details><br />`);
-    lines.push(`<details>
-                  <summary>How can I change the check status?</summary>
-                  If reviewers approve this PR, the reg context status will be green automatically.
-                  <br />
-               </details><br />`);
+                <summary>How can I change the check status?</summary>
+                If reviewers approve this PR, the reg context status will be green automatically.
+                <br />
+             </details><br />`);
   }
   return lines.join("\n");
 }
@@ -91,7 +143,7 @@ function findCommentsByRegApp(pr: NonNullable<NonNullable<UpdatePrCommentContext
   return hits.sort((c1, c2) => new Date(c2.createdAt).getTime() - new Date(c1.createdAt).getTime());
 }
 
-export function convert(context: UpdatePrCommentContextQuery, eventBody: CommentToPrEventBody): UpdateIssueCommentApiParams[] | { message: string }{
+export function convert(context: UpdatePrCommentContextQuery, eventBody: CommentToPrEventBody): UpdateIssueCommentApiParams[] | { message: string } {
   const repo = context.repository;
   if (!repo) {
     throw new NotInstallationError(eventBody.repository);
@@ -115,7 +167,7 @@ export function convert(context: UpdatePrCommentContextQuery, eventBody: Comment
     const commentsByRegsuit = findCommentsByRegApp(pr);
     if (!commentsByRegsuit.length) {
       return [
-        ...paramList, 
+        ...paramList,
         {
           method: "POST",
           path: `/repos/${repo.nameWithOwner}/issues/${pr.number}/comments`,
@@ -125,7 +177,7 @@ export function convert(context: UpdatePrCommentContextQuery, eventBody: Comment
         } as UpdateIssueCommentApiParams,
       ];
     } else {
-      switch(eventBody.behavior) {
+      switch (eventBody.behavior) {
         case "once":
           return paramList;
         case "new":
